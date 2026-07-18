@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>macOS Quantum - Infinite Cosmos Pro (Fixed v2)</title>
+    <style>
+        :root {
+            --bg-glass: rgba(18, 18, 28, 0.45);
+            --border-glass: rgba(255, 255, 255, 0.16);
+            --shadow-window: 0 40px 90px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255,255,255,0.15);
+            --accent-color: #007aff;
+            --accent-neon: #00e5ff;
+            --blur-val: 55px;
+            --font-mac: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+        }
+
+        * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; }
+
+        body, html {
+            width: 100%; height: 100%; overflow: hidden;
+            font-family: var(--font-mac); color: #f5f5f7;
+            background: radial-gradient(circle at 70% 30%, #200f3b, #070a24, #010206);
+            background-size: cover; perspective: 1500px;
+        }
+
+        body::before {
+            content: ''; position: absolute; width: 100%; height: 100%;
+            background: radial-gradient(circle at 15% 85%, var(--accent-color), transparent 45%);
+            pointer-events: none; opacity: 0.35; transition: background 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* ---------------------------------
+           macOS CORE COMPONENTS
+        --------------------------------- */
+        .menubar {
+            position: fixed; top: 0; width: 100%; height: 24px;
+            background: rgba(12, 12, 18, 0.2); backdrop-filter: blur(40px) saturate(210%);
+            border-bottom: 0.5px solid rgba(255, 255, 255, 0.09);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 16px; font-size: 13px; font-weight: 500; z-index: 1000000;
+        }
+        .menubar-left, .menubar-right { display: flex; gap: 14px; align-items: center; }
+        .menubar span { cursor: default; transition: opacity 0.2s; }
+        .menubar span:hover { opacity: 0.65; }
+
+        #desktop {
+            position: absolute; top: 24px; width: 100%; height: calc(100vh - 24px);
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), filter 0.6s;
+            padding-left: 90px;
+        }
+
+        /* ---------------------------------
+           STAGE MANAGER
+        --------------------------------- */
+        #stage-manager {
+            position: fixed; top: 40px; left: 10px; width: 75px; height: calc(100vh - 120px);
+            display: flex; flex-direction: column; gap: 20px; justify-content: center; z-index: 9999;
+        }
+        .stage-thumbnail {
+            width: 64px; height: 48px; background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px); border-radius: 8px;
+            border: 0.5px solid rgba(255,255,255,0.1); cursor: pointer;
+            transform: rotateY(25px) translateZ(0); transform-origin: left center;
+            box-shadow: -5px 10px 20px rgba(0,0,0,0.4);
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s;
+            display: flex; align-items: center; justify-content: center; font-size: 20px;
+        }
+        .stage-thumbnail:hover {
+            transform: rotateY(10deg) scale(1.1) translateX(5px);
+            box-shadow: -10px 15px 30px rgba(0,0,0,0.6);
+        }
+
+        /* ---------------------------------
+           WINDOW ARCHITECTURE
+        --------------------------------- */
+        .window {
+            position: absolute; width: 560px; height: 400px;
+            background: var(--bg-glass); backdrop-filter: blur(var(--blur-val)) saturate(230%);
+            border-radius: 12px; border: 0.5px solid var(--border-glass);
+            box-shadow: var(--shadow-window); display: flex; flex-direction: column;
+            transform: scale(0.9); opacity: 0; pointer-events: none;
+            transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+        }
+        .window.active { transform: scale(1); opacity: 1; pointer-events: auto; }
+        .window.minimized { transform: scale(0.05) translateY(1000px) translateX(-50%) !important; opacity: 0 !important; pointer-events: none !important; }
+        .window.stage-hidden { transform: scale(0.7) translateX(-250px) rotateY(30deg) !important; opacity: 0 !important; pointer-events: none !important; }
+
+        .titlebar {
+            height: 40px; display: flex; align-items: center; padding: 0 16px;
+            position: relative; border-bottom: 0.5px solid rgba(255,255,255,0.07);
+        }
+        .window-btns { display: flex; gap: 8px; position: absolute; left: 16px; z-index: 1000; }
+        .win-btn {
+            width: 12px; height: 12px; border-radius: 50%; border: 0.5px solid rgba(0,0,0,0.15);
+            position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .win-btn::after { position: absolute; font-size: 9px; font-weight: bold; color: rgba(0,0,0,0.6); display: none; }
+        .titlebar:hover .win-btn::after { display: block; }
+        .btn-close { background: #ff5f56; } .btn-close::after { content: '×'; top: -1px; }
+        .btn-min { background: #ffbd2e; } .btn-min::after { content: '−'; top: -2px; }
+        .btn-max { background: #27c93f; } .btn-max::after { content: '＋'; top: -1px; }
+        
+        .window-title { width: 100%; text-align: center; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); }
+        .window-content { flex-grow: 1; position: relative; overflow: hidden; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+
+        /* ---------------------------------
+           APPLICATION INTERFACES
+        --------------------------------- */
+        /* ⚙️ System Settings */
+        .settings-layout { display: flex; height: 100%; }
+        .settings-sidebar {
+            width: 140px; background: rgba(0,0,0,0.2); border-right: 0.5px solid rgba(255,255,255,0.06);
+            padding: 16px 10px; display: flex; flex-direction: column; gap: 6px;
+        }
+        .sidebar-item { padding: 8px 12px; border-radius: 8px; font-size: 12px; cursor: pointer; transition: background 0.2s; }
+        .sidebar-item.selected { background: var(--accent-color); font-weight: 600; }
+        .settings-main { flex-grow: 1; padding: 24px; font-size: 13px; display: flex; flex-direction: column; gap: 20px; }
+        .color-pickers { display: flex; gap: 12px; margin-top: 6px; }
+        .color-dot { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transform: scale(1); transition: transform 0.2s; }
+        .color-dot:hover { transform: scale(1.15); }
+        .color-dot.active { border-color: #fff; }
+        .control-group { display: flex; flex-direction: column; gap: 8px; }
+        .control-group input[type="range"] { width: 100%; accent-color: var(--accent-color); }
+
+        /* 💬 iMessage */
+        .chat-layout { display: flex; flex-direction: column; height: 100%; background: rgba(10,10,15,0.2); }
+        .chat-messages { flex-grow: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .chat-bubble { max-width: 70%; padding: 10px 14px; border-radius: 18px; font-size: 13px; line-height: 1.4; word-wrap: break-word; }
+        .chat-bubble.me { background: linear-gradient(180deg, #2997ff, #0055ff); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .chat-bubble.bot { background: rgba(255,255,255,0.15); color: #fff; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .chat-input-area { padding: 12px; display: flex; gap: 8px; border-top: 0.5px solid rgba(255,255,255,0.08); }
+        .chat-input-area input {
+            flex-grow: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 20px; padding: 8px 16px; color: white; outline: none; font-size: 13px;
+        }
+        .chat-input-area button { background: var(--accent-color); border: none; color: white; padding: 0 16px; border-radius: 20px; font-weight: 600; cursor: pointer; }
+
+        /* 🎵 Apple Music */
+        .music-layout { display: flex; flex-direction: column; height: 100%; align-items: center; justify-content: center; padding: 30px; background: linear-gradient(180deg, rgba(40,10,30,0.4), rgba(10,10,20,0.4)); }
+        .track-art { width: 140px; height: 140px; border-radius: 16px; background: linear-gradient(45deg, #ff2d55, #ff9500); box-shadow: 0 15px 35px rgba(255,45,85,0.3); margin-bottom: 20px; display: flex; align-items: center; justify-content: center; font-size: 48px; }
+        .track-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+        .track-artist { font-size: 13px; opacity: 0.6; margin-bottom: 20px; }
+        .player-controls { display: flex; gap: 24px; align-items: center; }
+        .play-btn { width: 54px; height: 54px; border-radius: 50%; background: #fff; color: #000; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; transition: transform 0.2s; }
+        .play-btn:hover { transform: scale(1.08); }
+
+        /* 🖼️ Photos */
+        .photos-layout { display: flex; height: 100%; align-items: center; justify-content: center; background: #000; overflow: hidden; }
+        .gallery-3d { display: flex; gap: 15px; transform-style: preserve-3d; }
+        .photo-card {
+            width: 90px; height: 130px; border-radius: 8px; background: linear-gradient(135deg, #00f2fe, #4facfe);
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), filter 0.5s;
+            cursor: pointer; filter: brightness(0.5); transform: rotateY(-30deg) translateZ(0);
+        }
+        .photo-card:hover { filter: brightness(1); transform: scale(1.2) rotateY(0deg) translateZ(50px); }
+
+        /* ---------------------------------
+           SPOTLIGHT SEARCH
+        --------------------------------- */
+        #spotlight {
+            position: fixed; top: 18%; left: 50%; transform: translateX(-50%) scale(0.95);
+            width: 600px; background: rgba(25, 25, 35, 0.7); backdrop-filter: blur(50px) saturate(200%);
+            border-radius: 14px; border: 0.5px solid rgba(255,255,255,0.25);
+            box-shadow: 0 30px 100px rgba(0,0,0,0.8); z-index: 2000000;
+            opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #spotlight.visible { opacity: 1; pointer-events: auto; transform: translateX(-50%) scale(1); }
+        .spotlight-input-wrap { display: flex; align-items: center; padding: 14px 18px; border-bottom: 0.5px solid rgba(255,255,255,0.1); }
+        .spotlight-input-wrap input {
+            flex-grow: 1; background: transparent; border: none; color: white;
+            font-size: 20px; outline: none; font-family: var(--font-mac);
+        }
+        .spotlight-results { max-height: 250px; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; }
+        .spotlight-item { padding: 10px 14px; border-radius: 8px; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 12px; }
+        .spotlight-item:hover, .spotlight-item.selected { background: var(--accent-color); }
+
+        /* ---------------------------------
+           NOTIFICATION CENTER & WIDGETS
+        --------------------------------- */
+        #notification-center {
+            position: fixed; top: 24px; right: -320px; width: 300px; height: calc(100vh - 24px);
+            background: rgba(10, 10, 15, 0.25); backdrop-filter: blur(45px) saturate(190%);
+            border-left: 0.5px solid rgba(255,255,255,0.08); padding: 20px;
+            display: flex; flex-direction: column; gap: 20px; z-index: 99999;
+            transition: right 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #notification-center.visible { right: 0; }
+        .widget {
+            background: rgba(255,255,255,0.07); border-radius: 16px; padding: 16px;
+            border: 0.5px solid rgba(255,255,255,0.08); box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .widget-title { font-size: 11px; font-weight: 700; opacity: 0.5; margin-bottom: 8px; text-transform: uppercase; }
+
+        .toast-notification {
+            position: fixed; top: 40px; right: -360px; width: 320px;
+            background: rgba(25, 25, 30, 0.6); backdrop-filter: blur(30px);
+            border-radius: 12px; border: 0.5px solid rgba(255,255,255,0.15);
+            padding: 14px; box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+            display: flex; gap: 12px; align-items: center; z-index: 3000000;
+            transition: right 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .toast-notification.show { right: 20px; }
+
+        /* ---------------------------------
+           DYNAMIC DOCK SYSTEM & BOUNCE
+        --------------------------------- */
+        .dock-container {
+            position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+            padding: 7px 10px; background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(40px) saturate(210%); border-radius: 24px;
+            border: 0.5px solid rgba(255, 255, 255, 0.16);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5); z-index: 1000000;
+            display: flex; align-items: flex-end; height: 68px;
+        }
+        .dock { display: flex; align-items: flex-end; gap: 10px; height: 100%; }
+        .dock-item {
+            width: 46px; height: 46px; border-radius: 12px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0.02));
+            border: 0.5px solid rgba(255,255,255,0.09);
+            display: flex; justify-content: center; align-items: center; font-size: 26px;
+            cursor: pointer; transform-origin: bottom center; position: relative;
+            will-change: width, height, transform;
+        }
+        .dock-item.running::after {
+            content: ''; position: absolute; bottom: -5px; width: 4px; height: 4px;
+            background: #fff; border-radius: 50%; opacity: 0.95; box-shadow: 0 0 4px #fff;
+        }
+
+        /* Mac独自のピョンピョン跳ねるアニメーション */
+        @keyframes dockBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        .dock-item.bouncing {
+            animation: dockBounce 0.4s ease infinite;
+        }
+
+        #hot-corner { position: fixed; bottom: 0; right: 0; width: 6px; height: 6px; z-index: 10000000; }
+        canvas { width: 100%; height: 100%; background: #010103; }
+        .terminal-text { padding: 16px; font-family: "SF Mono", monospace; font-size: 12px; color: #39ff14; line-height: 1.5; overflow-y: auto; height: 100%; }
+    </style>
+</head>
+<body>
+
+    <!-- 💻 macOS メニューバー -->
+    <div class="menubar">
+        <div class="menubar-left">
+            <span style="font-size:16px; font-weight:700;"></span>
+            <span style="font-weight:700;">Finder</span>
+            <span>ファイル</span><span>編集</span><span>表示</span>
+            <span onclick="toggleStageManager()" style="cursor:pointer; color:var(--accent-neon);">⚡ Stage Manager</span>
+        </div>
+        <div class="menubar-right">
+            <span onclick="toggleSpotlight()" style="cursor:pointer;">🔍</span>
+            <span onclick="toggleNC()" style="cursor:pointer; font-weight:700;">🎛️</span>
+            <span id="clock" style="font-variant-numeric: tabular-nums;">00:00:00</span>
+        </div>
+    </div>
+
+    <!-- 🎚️ 右側通知センター -->
+    <div id="notification-center">
+        <div class="widget">
+            <div class="widget-title">Quantum Clock</div>
+            <div id="widget-time" style="font-size: 28px; font-weight: 200; text-align:center;">00:00</div>
+        </div>
+        <div class="widget">
+            <div class="widget-title">CPU Quantum Load</div>
+            <div style="display:flex; align-items:flex-end; gap:4px; height:60px; margin-top:10px;" id="cpu-graph"></div>
+        </div>
+    </div>
+
+    <!-- 🔍 Spotlight -->
+    <div id="spotlight">
+        <div class="spotlight-input-wrap">
+            <input type="text" id="spotlight-field" placeholder="Spotlight 検索" oninput="searchSpotlight(this.value)">
+        </div>
+        <div class="spotlight-results" id="spotlight-results"></div>
+    </div>
+
+    <!-- 🔔 プッシュ通知 -->
+    <div class="toast-notification" id="toast">
+        <div style="font-size:24px;">💬</div>
+        <div>
+            <div style="font-weight:700; font-size:13px;">iMessage</div>
+            <div style="font-size:12px; opacity:0.8;" id="toast-body">新着メッセージがあります</div>
+        </div>
+    </div>
+
+    <!-- ⚡ Stage Manager スタック領域 -->
+    <div id="stage-manager" style="display:none;"></div>
+
+    <div id="hot-corner"></div>
+
+    <!-- 🗺️ デスクトップ -->
+    <div id="desktop">
+
+        <!-- 🎮 Core Game -->
+        <div id="win-game" class="window active" style="top:50px; left:120px; z-index: 100;">
+            <div class="titlebar">
+                <div class="window-btns">
+                    <div class="win-btn btn-close" onclick="closeWin('win-game')"></div>
+                    <div class="win-btn btn-min" onclick="minimizeWin('win-game')"></div>
+                    <div class="win-btn btn-max" onclick="maximizeWin('win-game')"></div>
+                </div>
+                <div class="window-title">Cyber Geometry Core</div>
+            </div>
+            <div class="window-content"><canvas id="gameCanvas"></canvas></div>
+        </div>
+
+        <!-- 📟 Terminal -->
+        <div id="win-term" class="window" style="top:140px; left:480px; z-index: 90;">
+            <div class="titlebar">
+                <div class="window-btns">
+                    <div class="win-btn btn-close" onclick="closeWin('win-term')"></div>
+                    <div class="win-btn btn-min" onclick="minimizeWin('win-term')"></div>
+                    <div class="win-btn btn-max" onclick="maximizeWin('win-term')"></div>
+                </div>
+                <div class="window-title">zsh — quantum_kernel</div>
+            </div>
+            <div class="window-content"><div class="terminal-text" id="term-out"></div></div>
+        </div>
+
+        <!-- ⚙️ System Settings -->
+        <div id="win-settings" class="window" style="top:220px; left:250px; width:520px; height:380px; z-index: 95;">
+            <div class="titlebar">
+                <div class="window-btns">
+                    <div class="win-btn btn-close" onclick="closeWin('win-settings')"></div>
+                    <div class="win-btn btn-min" onclick="minimizeWin('win-settings')"></div>
+                    <div class="win-btn btn-max" onclick="maximizeWin('win-settings')"></div>
+                </div>
+                <div class="window-title">システム環境設定</div>
+            </div>
+            <div class="window-content" style="background: rgba(10,10,15,0.4);">
+                <div class="settings-layout">
+                    <div class="settings-sidebar">
+                        <div class="sidebar-item selected">🖥️ 外観度</div>
+                    </div>
+                    <div class="settings-main">
+                        <div class="control-group">
+                            <label>アクセントカラー</label>
+                            <div class="color-pickers">
+                                <div class="color-dot active" style="background:#007aff;" onclick="changeAccent('#007aff', this)"></div>
+                                <div class="color-dot" style="background:#ff2d55;" onclick="changeAccent('#ff2d55', this)"></div>
+                                <div class="color-dot" style="background:#34c759;" onclick="changeAccent('#34c759', this)"></div>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label>Dockの拡大倍率</label>
+                            <input type="range" min="10" max="60" value="26" oninput="maxExpansion = parseInt(this.value)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 💬 iMessage -->
+        <div id="win-message" class="window" style="top:80px; left:320px; width:440px; height:480px; z-index: 80;">
+            <div class="titlebar">
+                <div class="window-btns">
+                    <div class="win-btn btn-close" onclick="closeWin('win-message')"></div>
+                    <div class="win-btn btn-min" onclick="minimizeWin('win-message')"></div>
+                    <div class="win-btn btn-max" onclick="maximizeWin('win-message')"></div>
+                </div>
+                <div class="window-title">メッセージ</div>
+            </div>
+            <div class="window-content">
+                <div class="chat-layout">
+                    <div class="chat-messages" id="chat-box">
+                        <div class="chat-bubble bot">macOS Quantumへようこそ。何か用かい？</div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chat-input" placeholder="iMessage" onkeydown="if(event.key==='Enter') sendChat()">
+                        <button onclick="sendChat()">送信</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🎵 Apple Music -->
+        <div id="win-music" class="window" style="top:180px; left:180px; width:380px; height:380px; z-index: 85;">
+            <div class="titlebar">
+                <div class="window-btns">
+                    <div class="win-btn btn-close" onclick="closeWin('win-music')"></div>
+                    <div class="win-btn btn-min" onclick="minimizeWin('win-music')"></div>
+                    <div class="win-btn btn-max" onclick="maximizeWin('win-music')"></div>
+                </div>
+                <div class="window-title">ミュージック</div>
+            </div>
+            <div class="window-content">
+                <div class="music-layout">
+                    <div class="track-art">🎵</div>
+                    <div class="track-title">Cyber Resonance</div>
+                    <div class="track-artist">Quantum Synth Engine</div>
+                    <div class="player-controls">
+                        <div class="play-btn" id="music-btn" onclick="toggleMusic()">▶</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🖼️ Photos -->
+        <div id="win-photos" class="window" style="top:250px; left:420px; width:460px; height:320px; z-index: 75;">
+            <div class="titlebar">
+                <div class="window-btns">
+                    <div class="win-btn btn-close" onclick="closeWin('win-photos')"></div>
+                    <div class="win-btn btn-min" onclick="minimizeWin('win-photos')"></div>
+                    <div class="win-btn btn-max" onclick="maximizeWin('win-photos')"></div>
+                </div>
+                <div class="window-title">写真</div>
+            </div>
+            <div class="window-content">
+                <div class="photos-layout">
+                    <div class="gallery-3d">
+                        <div class="photo-card" style="background:linear-gradient(45deg, #ff3b30, #ff9500)"></div>
+                        <div class="photo-card" style="background:linear-gradient(45deg, #af52de, #ff2d55)"></div>
+                        <div class="photo-card" style="background:linear-gradient(45deg, #5ac8fa, #5856d6)"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 🔘 Dock -->
+    <div class="dock-container">
+        <div class="dock" id="macDock">
+            <div class="dock-item running" data-target="win-game" title="ゲーム">🎮</div>
+            <div class="dock-item" data-target="win-term" title="ターミナル">📟</div>
+            <div class="dock-item" data-target="win-settings" title="システム環境設定">⚙️</div>
+            <div class="dock-item" data-target="win-message" title="メッセージ">💬</div>
+            <div class="dock-item" data-target="win-music" title="ミュージック">🎵</div>
+            <div class="dock-item" data-target="win-photos" title="写真">🖼️</div>
+        </div>
+    </div>
+
+    <script>
+        let maxExpansion = 26;
+        let topZ = 100;
+        let isStageManager = false;
+        let audioCtx = null, oscillator = null;
+
+        const apps = [
+            { id: 'win-game', name: 'Cyber Geometry Core (ゲーム)', icon: '🎮' },
+            { id: 'win-term', name: 'Terminal (ターミナル)', icon: '📟' },
+            { id: 'win-settings', name: 'System Settings (システム環境設定)', icon: '⚙️' },
+            { id: 'win-message', name: 'iMessage (メッセージ)', icon: '💬' },
+            { id: 'win-music', name: 'Apple Music (ミュージック)', icon: '🎵' },
+            { id: 'win-photos', name: 'Photos (写真ギャラリー)', icon: '🖼️' }
+        ];
+
+        // 時計同期
+        setInterval(() => {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            document.getElementById('clock').innerText = timeStr;
+            document.getElementById('widget-time').innerText = timeStr.substring(0, 5);
+        }, 1000);
+
+        // CPUモニター
+        const graph = document.getElementById('cpu-graph');
+        setInterval(() => {
+            if(graph.children.length > 25) graph.removeChild(graph.firstChild);
+            const bar = document.createElement('div');
+            const h = Math.random() * 50 + 10;
+            bar.style.width = '6px'; bar.style.height = `${h}px`;
+            bar.style.background = 'var(--accent-color)'; bar.style.borderRadius = '2px';
+            graph.appendChild(bar);
+        }, 800);
+
+        // ウィンドウクリックフォーカス
+        document.querySelectorAll('.window').forEach(w => {
+            w.addEventListener('mousedown', () => { focusWin(w.id); });
+        });
+
+        function focusWin(id) {
+            topZ++;
+            const w = document.getElementById(id);
+            w.style.zIndex = topZ;
+        }
+
+        // ウィンドウ閉じる / 最小化
+        function closeWin(id) {
+            const w = document.getElementById(id);
+            w.classList.remove('active', 'minimized', 'stage-hidden');
+            document.querySelector(`[data-target="${id}"]`).classList.remove('running');
+            if(isStageManager) refreshStageManager();
+        }
+        function minimizeWin(id) { 
+            document.getElementById(id).classList.add('minimized'); 
+            if(isStageManager) refreshStageManager();
+        }
+        
+        // 🚀 【最重要の修正点】確実な起動・復帰ロジック
+        function openWin(id) {
+            const w = document.getElementById(id);
+            
+            // 全ての一時的な非表示状態を強制クリア
+            w.classList.remove('minimized', 'stage-hidden');
+            w.classList.add('active');
+            
+            // 最前面へ引き出す
+            focusWin(id);
+            
+            // Dockに起動中のインジケータ（白丸）を付与
+            document.querySelector(`[data-target="${id}"]`).classList.add('running');
+            
+            // Stage Managerが有効な場合は他のアクティブ窓を裏へ回す
+            if(isStageManager) {
+                document.querySelectorAll('.window.active').forEach(win => {
+                    if(win.id !== id) win.classList.add('stage-hidden');
+                });
+            }
+            refreshStageManager();
+        }
+
+        function maximizeWin(id) {
+            const w = document.getElementById(id);
+            w.style.transition = "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)";
+            if(w.style.width === "100vw") {
+                w.style.width = "560px"; w.style.height = "400px"; w.style.top = "100px"; w.style.left = "120px";
+            } else {
+                w.style.width = "100vw"; w.style.height = "calc(100vh - 24px)"; w.style.top = "24px"; w.style.left = "0px";
+            }
+        }
+
+        // 🎨 Stage Manager
+        function toggleStageManager() {
+            isStageManager = !isStageManager;
+            const smZone = document.getElementById('stage-manager');
+            if(isStageManager) {
+                smZone.style.display = 'flex';
+                let actives = Array.from(document.querySelectorAll('.window.active'));
+                if(actives.length > 1) {
+                    actives.forEach((w, i) => { if(i > 0) w.classList.add('stage-hidden'); });
+                }
+                refreshStageManager();
+            } else {
+                smZone.style.display = 'none';
+                document.querySelectorAll('.window').forEach(w => w.classList.remove('stage-hidden'));
+            }
+        }
+
+        function refreshStageManager() {
+            const smZone = document.getElementById('stage-manager');
+            smZone.innerHTML = '';
+            document.querySelectorAll('.window').forEach(w => {
+                const isHiddenByStage = w.classList.contains('stage-hidden');
+                const isMinimized = w.classList.contains('minimized');
+                const isRunningButNotShowing = w.classList.contains('active') && isHiddenByStage;
+                
+                if(isMinimized || isRunningButNotShowing) {
+                    const thumb = document.createElement('div');
+                    thumb.className = 'stage-thumbnail';
+                    const appData = apps.find(a => a.id === w.id);
+                    thumb.innerText = appData ? appData.icon : '💻';
+                    thumb.onclick = () => openWin(w.id);
+                    smZone.appendChild(thumb);
+                }
+            });
+        }
+
+        // 🔍 Spotlight
+        function toggleSpotlight() { document.getElementById('spotlight').classList.toggle('visible'); document.getElementById('spotlight-field').focus(); }
+        window.addEventListener('keydown', (e) => { if(e.metaKey && e.code === 'Space') { e.preventDefault(); toggleSpotlight(); } });
+
+        function searchSpotlight(q) {
+            const resultsBox = document.getElementById('spotlight-results');
+            resultsBox.innerHTML = '';
+            if(!q) return;
+            const filtered = apps.filter(a => a.name.toLowerCase().includes(q.toLowerCase()));
+            filtered.forEach(app => {
+                const item = document.createElement('div');
+                item.className = 'spotlight-item';
+                item.innerHTML = `<span>${app.icon}</span> <span>${app.name}</span>`;
+                item.onclick = () => { openWin(app.id); toggleSpotlight(); document.getElementById('spotlight-field').value=''; resultsBox.innerHTML=''; };
+                resultsBox.appendChild(item);
+            });
+        }
+
+        // 🎛️ 通知センター
+        function toggleNC() { document.getElementById('notification-center').classList.toggle('visible'); }
+
+        // 💬 iMessage AI
+        function triggerNotification(text) {
+            document.getElementById('toast-body').innerText = text;
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 4000);
+        }
+
+        function sendChat() {
+            const inp = document.getElementById('chat-input');
+            const box = document.getElementById('chat-box');
+            if(!inp.value.trim()) return;
+
+            box.innerHTML += `<div class="chat-bubble me">${inp.value}</div>`;
+            const userMsg = inp.value;
+            inp.value = '';
+            box.scrollTop = box.scrollHeight;
+
+            setTimeout(() => {
+                let reply = "自律思考回路をアップデート中。";
+                if(userMsg.includes("ゲーム")) reply = "ゲームコアのフレームレートは安定しているよ。";
+                if(userMsg.includes("カラー")) reply = "システム環境設定からいつでも装いを変更できる。";
+                box.innerHTML += `<div class="chat-bubble bot">${reply}</div>`;
+                box.scrollTop = box.scrollHeight;
+                triggerNotification(reply);
+            }, 1000);
+        }
+
+        // 🎵 Web Audio API
+        function toggleMusic() {
+            const btn = document.getElementById('music-btn');
+            if(!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                oscillator = audioCtx.createOscillator();
+                let gainNode = audioCtx.createGain();
+                
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(140, audioCtx.currentTime);
+                
+                setInterval(() => {
+                    const freqs = [140, 160, 180, 210, 240];
+                    if(oscillator) oscillator.frequency.setValueAtTime(freqs[Math.floor(Math.random()*freqs.length)], audioCtx.currentTime);
+                }, 300);
+
+                gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                btn.innerText = '⏸';
+            } else {
+                if(audioCtx.state === 'running') { audioCtx.suspend(); btn.innerText = '▶'; }
+                else { audioCtx.resume(); btn.innerText = '⏸'; }
+            }
+        }
+
+        // ⚙️ システム設定連動
+        function changeAccent(color, el) {
+            document.styleSheets[0].cssRules[0].style.setProperty('--accent-color', color);
+            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        // ドラッグシステム
+        document.querySelectorAll('.titlebar').forEach(tb => {
+            let isDrag = false, sx, sy, ix, iy, w = tb.parentElement;
+            tb.addEventListener('mousedown', (e) => {
+                if(e.target.classList.contains('win-btn')) return;
+                isDrag = true; sx = e.clientX; sy = e.clientY;
+                ix = w.offsetLeft; iy = w.offsetTop; w.style.transition = "none";
+                focusWin(w.id);
+            });
+            window.addEventListener('mousemove', (e) => {
+                if(!isDrag) return;
+                w.style.left = `${ix + (e.clientX - sx)}px`; w.style.top = `${iy + (e.clientY - sy)}px`;
+            });
+            window.addEventListener('mouseup', () => { if(isDrag) { isDrag = false; w.style.transition = "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease"; } });
+        });
+
+        //  Dock魚眼エフェクト ＆ 跳ねる起動アニメーション
+        const dock = document.getElementById('macDock');
+        const items = document.querySelectorAll('.dock-item');
+        
+        dock.addEventListener('mousemove', (e) => {
+            items.forEach(item => {
+                const rect = item.getBoundingClientRect();
+                const distance = Math.abs(e.clientX - (rect.left + rect.width / 2));
+                let expansion = 0, range = 140;
+                if (distance < range) expansion = Math.cos((distance / range) * Math.PI / 2) * maxExpansion;
+                item.style.width = item.style.height = `${46 + expansion}px`;
+            });
+        });
+        
+        dock.addEventListener('mouseleave', () => { items.forEach(item => { item.style.width = item.style.height = '46px'; }); });
+        
+        items.forEach(item => { 
+            item.addEventListener('click', () => { 
+                const targetId = item.dataset.target;
+                if(targetId) {
+                    // Macのようにアイコンを一時的にピョンピョン跳ねさせる
+                    item.classList.add('bouncing');
+                    setTimeout(() => { item.classList.remove('bouncing'); }, 800);
+                    
+                    // アプリウインドウの起動/復帰処理を実行
+                    openWin(targetId);
+                } 
+            }); 
+        });
+
+        // ホットコーナー
+        document.getElementById('hot-corner').addEventListener('mouseenter', () => {
+            document.querySelectorAll('.window.active').forEach(w => w.classList.toggle('minimized'));
+        });
+
+        // ターミナルログ
+        const term = document.getElementById('term-out');
+        const logs = ["Stage Manager engine online.", "Web Audio Sound Synth initialized.", "Spotlight index builder: Complete.", "Quantum macOS Core fully powered."];
+        let logIdx = 0;
+        setInterval(() => { if(logIdx < logs.length) { term.innerHTML += `root@quantum-mac ~ % ${logs[logIdx]}<br>`; logIdx++; } }, 1000);
+
+        // 🎮 ゲームレンダラー
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 560; canvas.height = 360;
+        let player = { x: 60, y: 200, size: 22, vy: 0, gravity: 0.5, jump: -10, grounded: false };
+
+        function drawGame() {
+            ctx.fillStyle = '#020208'; ctx.fillRect(0, 0, 560, 360);
+            player.vy += player.gravity; player.y += player.vy;
+            if(player.y > 260) { player.y = 260; player.vy = 0; player.grounded = true; }
+
+            const currentAccent = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
+            ctx.shadowBlur = 20; ctx.shadowColor = currentAccent; ctx.fillStyle = currentAccent;
+            ctx.fillRect(player.x, player.y, player.size, player.size);
+            ctx.shadowBlur = 0;
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.beginPath(); ctx.moveTo(0, 282); ctx.lineTo(560, 282); ctx.stroke();
+            requestAnimationFrame(drawGame);
+        }
+        window.addEventListener('keydown', (e) => {
+            if(e.code === 'Space' && player.grounded && document.activeElement.tagName !== 'INPUT') { player.vy = player.jump; player.grounded = false; }
+        });
+        drawGame();
+    </script>
+</body>
+</html>
