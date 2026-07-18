@@ -2,14 +2,15 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>macOS Quantum - Infinite Cosmos Pro (Fixed v2)</title>
+    <title>macOS Quantum - Infinite Cosmos Pro (Complete v5)</title>
     <style>
         :root {
-            --bg-glass: rgba(18, 18, 28, 0.45);
+            --bg-glass: rgba(10, 10, 18, 0.5);
             --border-glass: rgba(255, 255, 255, 0.16);
             --shadow-window: 0 40px 90px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255,255,255,0.15);
             --accent-color: #007aff;
             --accent-neon: #00e5ff;
+            --gemini-neon: linear-gradient(135deg, #7a22ff, #00e5ff, #246bfd);
             --blur-val: 55px;
             --font-mac: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
         }
@@ -19,7 +20,7 @@
         body, html {
             width: 100%; height: 100%; overflow: hidden;
             font-family: var(--font-mac); color: #f5f5f7;
-            background: radial-gradient(circle at 70% 30%, #200f3b, #070a24, #010206);
+            background: radial-gradient(circle at 70% 30%, #15092a, #030511, #000000);
             background-size: cover; perspective: 1500px;
         }
 
@@ -30,7 +31,7 @@
         }
 
         /* ---------------------------------
-           macOS CORE COMPONENTS
+           macOS CORE COMPONENTS & ACTIVE MENUBAR
         --------------------------------- */
         .menubar {
             position: fixed; top: 0; width: 100%; height: 24px;
@@ -39,18 +40,56 @@
             display: flex; justify-content: space-between; align-items: center;
             padding: 0 16px; font-size: 13px; font-weight: 500; z-index: 1000000;
         }
-        .menubar-left, .menubar-right { display: flex; gap: 14px; align-items: center; }
-        .menubar span { cursor: default; transition: opacity 0.2s; }
-        .menubar span:hover { opacity: 0.65; }
+        .menubar-left, .menubar-right { display: flex; gap: 4px; align-items: center; height: 100%; }
+        
+        .menu-item-container { position: relative; display: inline-flex; align-items: center; height: 100%; }
+        .menubar span { padding: 2px 10px; border-radius: 4px; cursor: default; transition: background 0.1s; display: inline-block; }
+        .menubar span:hover { background: rgba(255, 255, 255, 0.15); }
+        .menu-item-container.active > span { background: rgba(255, 255, 255, 0.2); }
+
+        .apple-dropdown {
+            position: absolute; top: 24px; left: 0; width: 200px;
+            background: rgba(25, 25, 35, 0.85); backdrop-filter: blur(25px);
+            border: 0.5px solid rgba(255,255,255,0.15); border-radius: 6px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: none; flex-direction: column; padding: 4px 0; z-index: 1000001;
+        }
+        .apple-dropdown.show { display: flex; }
+        .apple-dropdown item { padding: 6px 16px; font-size: 13px; color: #fff; cursor: default; display: flex; justify-content: space-between; align-items: center; }
+        .apple-dropdown item:hover { background: var(--accent-color); }
+        .apple-dropdown item .shortcut { opacity: 0.4; font-size: 11px; margin-left: 10px; }
+        .apple-dropdown divider { height: 0.5px; background: rgba(255,255,255,0.15); margin: 4px 0; }
 
         #desktop {
             position: absolute; top: 24px; width: 100%; height: calc(100vh - 24px);
-            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), filter 0.6s;
-            padding-left: 90px;
+            transition: filter 0.6s; padding-left: 90px; padding-right: 340px; 
         }
 
         /* ---------------------------------
-           STAGE MANAGER
+           SYSTEM OVERLAYS (SHUTDOWN / LOCK)
+        --------------------------------- */
+        #lock-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: radial-gradient(circle at 50% 30%, #1a103c, #050614);
+            z-index: 5000000; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            opacity: 1; transition: opacity 0.5s ease;
+        }
+        .lock-avatar { width: 90px; height: 90px; background: rgba(255,255,255,0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 44px; margin-bottom: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .lock-username { font-size: 20px; font-weight: 600; margin-bottom: 20px; }
+        .lock-input-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .lock-input-wrap input {
+            width: 180px; padding: 6px 12px; background: rgba(255,255,255,0.15); border: 0.5px solid rgba(255,255,255,0.2);
+            border-radius: 14px; color: white; text-align: center; font-size: 14px; outline: none; backdrop-filter: blur(10px);
+        }
+        .lock-hint { font-size: 11px; opacity: 0.5; height: 14px; color: #ff453a; }
+
+        #shutdown-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #000; z-index: 6000000; display: none; color: #fff;
+            align-items: center; justify-content: center; flex-direction: column; font-size: 14px;
+        }
+
+        /* ---------------------------------
+           STAGE MANAGER & WINDOWS
         --------------------------------- */
         #stage-manager {
             position: fixed; top: 40px; left: 10px; width: 75px; height: calc(100vh - 120px);
@@ -70,9 +109,6 @@
             box-shadow: -10px 15px 30px rgba(0,0,0,0.6);
         }
 
-        /* ---------------------------------
-           WINDOW ARCHITECTURE
-        --------------------------------- */
         .window {
             position: absolute; width: 560px; height: 400px;
             background: var(--bg-glass); backdrop-filter: blur(var(--blur-val)) saturate(230%);
@@ -88,6 +124,7 @@
         .titlebar {
             height: 40px; display: flex; align-items: center; padding: 0 16px;
             position: relative; border-bottom: 0.5px solid rgba(255,255,255,0.07);
+            cursor: move;
         }
         .window-btns { display: flex; gap: 8px; position: absolute; left: 16px; z-index: 1000; }
         .win-btn {
@@ -100,13 +137,12 @@
         .btn-min { background: #ffbd2e; } .btn-min::after { content: '−'; top: -2px; }
         .btn-max { background: #27c93f; } .btn-max::after { content: '＋'; top: -1px; }
         
-        .window-title { width: 100%; text-align: center; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); }
+        .window-title { width: 100%; text-align: center; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); pointer-events: none; }
         .window-content { flex-grow: 1; position: relative; overflow: hidden; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
 
         /* ---------------------------------
            APPLICATION INTERFACES
         --------------------------------- */
-        /* 🌐 Safari Browser */
         .safari-layout { display: flex; flex-direction: column; height: 100%; background: #fff; }
         .safari-address-bar {
             height: 38px; background: rgba(0, 0, 0, 0.05); border-bottom: 0.5px solid rgba(0,0,0,0.1);
@@ -122,7 +158,6 @@
         }
         .safari-view { width: 100%; flex-grow: 1; border: none; background: #fff; user-select: auto; }
 
-        /* ⚙️ System Settings */
         .settings-layout { display: flex; height: 100%; }
         .settings-sidebar {
             width: 140px; background: rgba(0,0,0,0.2); border-right: 0.5px solid rgba(255,255,255,0.06);
@@ -138,7 +173,6 @@
         .control-group { display: flex; flex-direction: column; gap: 8px; }
         .control-group input[type="range"] { width: 100%; accent-color: var(--accent-color); }
 
-        /* 💬 iMessage */
         .chat-layout { display: flex; flex-direction: column; height: 100%; background: rgba(10,10,15,0.2); }
         .chat-messages { flex-grow: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         .chat-bubble { max-width: 70%; padding: 10px 14px; border-radius: 18px; font-size: 13px; line-height: 1.4; word-wrap: break-word; }
@@ -151,7 +185,6 @@
         }
         .chat-input-area button { background: var(--accent-color); border: none; color: white; padding: 0 16px; border-radius: 20px; font-weight: 600; cursor: pointer; }
 
-        /* 🎵 Apple Music */
         .music-layout { display: flex; flex-direction: column; height: 100%; align-items: center; justify-content: center; padding: 30px; background: linear-gradient(180deg, rgba(40,10,30,0.4), rgba(10,10,20,0.4)); }
         .track-art { width: 140px; height: 140px; border-radius: 16px; background: linear-gradient(45deg, #ff2d55, #ff9500); box-shadow: 0 15px 35px rgba(255,45,85,0.3); margin-bottom: 20px; display: flex; align-items: center; justify-content: center; font-size: 48px; }
         .track-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
@@ -160,7 +193,6 @@
         .play-btn { width: 54px; height: 54px; border-radius: 50%; background: #fff; color: #000; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; transition: transform 0.2s; }
         .play-btn:hover { transform: scale(1.08); }
 
-        /* 🖼️ Photos */
         .photos-layout { display: flex; height: 100%; align-items: center; justify-content: center; background: #000; overflow: hidden; }
         .gallery-3d { display: flex; gap: 15px; transform-style: preserve-3d; }
         .photo-card {
@@ -171,7 +203,48 @@
         .photo-card:hover { filter: brightness(1); transform: scale(1.2) rotateY(0deg) translateZ(50px); }
 
         /* ---------------------------------
-           SPOTLIGHT SEARCH
+           🌌 DETACHED CYBER GEMINI WIDGET
+        --------------------------------- */
+        #gemini-desktop-widget {
+            position: fixed; top: 40px; right: 15px; width: 310px; height: calc(100vh - 140px);
+            background: rgba(12, 12, 24, 0.4); backdrop-filter: blur(40px) saturate(220%);
+            border-radius: 20px; border: 1px solid rgba(122, 34, 255, 0.25);
+            box-shadow: 0 30px 70px rgba(0,0,0,0.6), inset 0 1px 2px rgba(255,255,255,0.1);
+            display: flex; flex-direction: column; overflow: hidden; z-index: 1000;
+        }
+        .gemini-header {
+            padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .gemini-title-wrap { display: flex; align-items: center; gap: 10px; }
+        .gemini-logo-spark {
+            width: 18px; height: 18px; background: var(--gemini-neon);
+            clip-path: polygon(50% 0%, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0% 50%, 39% 39%);
+            animation: gemini-pulse 3s infinite linear;
+        }
+        @keyframes gemini-pulse {
+            0% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+            50% { transform: scale(1.2) rotate(180deg); filter: brightness(1.5); }
+            100% { transform: scale(1) rotate(360deg); filter: brightness(1); }
+        }
+        .gemini-title { font-size: 14px; font-weight: 700; background: var(--gemini-neon); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 0.5px; }
+        .gemini-badge { font-size: 9px; font-weight: 800; background: rgba(0, 229, 255, 0.15); color: var(--accent-neon); padding: 2px 6px; border-radius: 10px; border: 0.5px solid rgba(0,229,255,0.3); text-transform: uppercase; }
+        
+        .gemini-messages { flex-grow: 1; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .gemini-bubble { max-width: 85%; padding: 10px 14px; border-radius: 14px; font-size: 12.5px; line-height: 1.45; }
+        .gemini-bubble.me { background: rgba(255, 255, 255, 0.08); color: #fff; align-self: flex-end; border-bottom-right-radius: 2px; border: 0.5px solid rgba(255,255,255,0.1); }
+        .gemini-bubble.bot { background: linear-gradient(135deg, rgba(122, 34, 255, 0.15), rgba(0, 229, 255, 0.05)); border: 0.5px solid rgba(0,229,255,0.15); color: #e1e4f0; align-self: flex-start; border-bottom-left-radius: 2px; }
+        
+        .gemini-input-wrap { padding: 12px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; gap: 8px; background: rgba(0,0,0,0.15); }
+        .gemini-input-wrap input {
+            flex-grow: 1; background: rgba(255,255,255,0.05); border: 0.5px solid rgba(255,255,255,0.12);
+            border-radius: 10px; padding: 8px 12px; color: white; outline: none; font-size: 12px; transition: border 0.3s;
+        }
+        .gemini-input-wrap input:focus { border-color: #00e5ff; }
+        .gemini-input-wrap button { background: var(--gemini-neon); border: none; color: white; padding: 0 14px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+        /* ---------------------------------
+           SPOTLIGHT SEARCH & WIDGETS
         --------------------------------- */
         #spotlight {
             position: fixed; top: 18%; left: 50%; transform: translateX(-50%) scale(0.95);
@@ -190,9 +263,6 @@
         .spotlight-item { padding: 10px 14px; border-radius: 8px; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 12px; }
         .spotlight-item:hover, .spotlight-item.selected { background: var(--accent-color); }
 
-        /* ---------------------------------
-           NOTIFICATION CENTER & WIDGETS
-        --------------------------------- */
         #notification-center {
             position: fixed; top: 24px; right: -320px; width: 300px; height: calc(100vh - 24px);
             background: rgba(10, 10, 15, 0.25); backdrop-filter: blur(45px) saturate(190%);
@@ -218,7 +288,7 @@
         .toast-notification.show { right: 20px; }
 
         /* ---------------------------------
-           DYNAMIC DOCK SYSTEM & BOUNCE
+           DYNAMIC DOCK SYSTEM
         --------------------------------- */
         .dock-container {
             position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
@@ -238,42 +308,93 @@
             will-change: width, height, transform;
             transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .dock-item:hover {
-            transform: scale(1.22) translateY(-4px);
-        }
+        .dock-item:hover { transform: scale(1.22) translateY(-4px); }
         .dock-item.running::after {
             content: ''; position: absolute; bottom: -5px; width: 4px; height: 4px;
             background: #fff; border-radius: 50%; opacity: 0.95; box-shadow: 0 0 4px #fff;
         }
 
-        @keyframes dockBounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
-        }
-        .dock-item.bouncing {
-            animation: dockBounce 0.4s ease infinite;
-        }
-
         #hot-corner { position: fixed; bottom: 0; right: 0; width: 6px; height: 6px; z-index: 10000000; }
-        canvas { width: 100%; height: 100%; background: #010103; }
+        canvas { width: 100%; height: 100%; background: #0b0f19; }
         .terminal-text { padding: 16px; font-family: "SF Mono", monospace; font-size: 12px; color: #39ff14; line-height: 1.5; overflow-y: auto; height: 100%; }
     </style>
 </head>
-<body>
+<body onclick="closeAllMenusOutside(event)">
 
-    <!-- 💻 macOS メニューバー -->
-    <div class="menubar">
+    <!-- 💻 macOS メニューバー (ホバー展開 & 動的連動完全版) -->
+    <div class="menubar" onmouseleave="menuBarMouseLeave()">
         <div class="menubar-left">
-            <span style="font-size:16px; font-weight:700;"></span>
-            <span style="font-weight:700;">Finder</span>
-            <span>ファイル</span><span>編集</span><span>表示</span>
-            <span onclick="toggleStageManager()" style="cursor:pointer; color:var(--accent-neon);">⚡ Stage Manager</span>
+            <!-- Apple メニュー -->
+            <div class="menu-item-container" id="container-apple" onmouseenter="menuBarMouseEnter('appleMenu', 'container-apple')">
+                <span style="font-size:16px; font-weight:700;" onclick="toggleMenu('appleMenu', 'container-apple', event)"></span>
+                <div class="apple-dropdown" id="appleMenu">
+                    <item onclick="lockSystem()">画面をロック <span class="shortcut">⌃⌘Q</span></item>
+                    <divider></divider>
+                    <item onclick="restartSystem()">再起動...</item>
+                    <item onclick="shutdownSystem()">システム終了...</item>
+                </div>
+            </div>
+
+            <!-- 動的アプリネーム表記 -->
+            <div class="menu-item-container"><span id="active-app-name" style="font-weight:700;">Finder</span></div>
+
+            <!-- ファイルメニュー -->
+            <div class="menu-item-container" id="container-file" onmouseenter="menuBarMouseEnter('fileMenu', 'container-file')">
+                <span onclick="toggleMenu('fileMenu', 'container-file', event)">ファイル</span>
+                <div class="apple-dropdown" id="fileMenu">
+                    <item onclick="openWin('win-safari')">新規Safariウインドウ</item>
+                    <item onclick="openWin('win-game')">新規ゲームウインドウ</item>
+                    <item onclick="openWin('win-term')">新規ターミナル</item>
+                    <divider></divider>
+                    <item onclick="closeTopWindow()">ウインドウを閉じる <span class="shortcut">⌘W</span></item>
+                </div>
+            </div>
+
+            <!-- 編集メニュー -->
+            <div class="menu-item-container" id="container-edit" onmouseenter="menuBarMouseEnter('editMenu', 'container-edit')">
+                <span onclick="toggleMenu('editMenu', 'container-edit', event)">編集</span>
+                <div class="apple-dropdown" id="editMenu">
+                    <item onclick="triggerNotification('コピー', 'クリップボードに退避しました')">コピー <span class="shortcut">⌘C</span></item>
+                    <item onclick="triggerNotification('ペースト', 'データを挿入しました')">ペースト <span class="shortcut">⌘V</span></item>
+                    <divider></divider>
+                    <item onclick="clearAllTerminal()">ターミナルログを消去</item>
+                </div>
+            </div>
+
+            <!-- 表示メニュー -->
+            <div class="menu-item-container" id="container-view" onmouseenter="menuBarMouseEnter('viewMenu', 'container-view')">
+                <span onclick="toggleMenu('viewMenu', 'container-view', event)">表示</span>
+                <div class="apple-dropdown" id="viewMenu">
+                    <item onclick="toggleStageManager()">Stage Managerを切り替え</item>
+                    <item onclick="cycleBackground()">壁紙の配色を変更</item>
+                    <divider></divider>
+                    <item onclick="restartSystem()">デスクトップをリロード</item>
+                </div>
+            </div>
+
+            <span onclick="toggleStageManager()" style="cursor:pointer; color:var(--accent-neon); font-size:12px;">⚡ Stage Manager</span>
         </div>
+        
         <div class="menubar-right">
-            <span onclick="toggleSpotlight()" style="cursor:pointer;">🔍</span>
-            <span onclick="toggleNC()" style="cursor:pointer; font-weight:700;">🎛️</span>
-            <span id="clock" style="font-variant-numeric: tabular-nums;">00:00:00</span>
+            <div class="menu-item-container"><span onclick="toggleSpotlight()" style="cursor:pointer;">🔍</span></div>
+            <div class="menu-item-container"><span onclick="toggleNC()" style="cursor:pointer; font-weight:700;">🎛️</span></div>
+            <div class="menu-item-container"><span id="clock" onclick="toggleNC()" style="font-variant-numeric: tabular-nums; cursor:pointer;">00:00:00</span></div>
         </div>
+    </div>
+
+    <!-- 🔒 ロック画面オーバーレイ -->
+    <div id="lock-screen" style="display: flex; opacity: 1;">
+        <div class="lock-avatar">👤</div>
+        <div class="lock-username">Quantum User</div>
+        <div class="lock-input-wrap">
+            <input type="password" id="lock-password" placeholder="パスワードを入力" onkeydown="if(event.key==='Enter') unlockSystem()">
+            <div class="lock-hint" id="lock-hint"></div>
+        </div>
+    </div>
+
+    <!-- 🔌 シャットダウン / 再起動用ブラックアウト -->
+    <div id="shutdown-screen">
+        <span id="shutdown-text"></span>
     </div>
 
     <!-- 🎚️ 右側通知センター -->
@@ -298,10 +419,10 @@
 
     <!-- 🔔 プッシュ通知 -->
     <div class="toast-notification" id="toast">
-        <div style="font-size:24px;">💬</div>
+        <div style="font-size:24px;">🔮</div>
         <div>
-            <div style="font-weight:700; font-size:13px;">iMessage</div>
-            <div style="font-size:12px; opacity:0.8;" id="toast-body">新着メッセージがあります</div>
+            <div style="font-weight:700; font-size:13px;">Quantum AI Core</div>
+            <div style="font-size:12px; opacity:0.8;" id="toast-body">思考エンジンが更新されました</div>
         </div>
     </div>
 
@@ -313,8 +434,26 @@
     <!-- 🗺️ デスクトップ -->
     <div id="desktop">
 
+        <!-- 🌌 CYBER GEMINI DESKTOP WIDGET (常駐ガジェット) -->
+        <div id="gemini-desktop-widget">
+            <div class="gemini-header">
+                <div class="gemini-title-wrap">
+                    <div class="gemini-logo-spark"></div>
+                    <div class="gemini-title">Gemini Experimental</div>
+                </div>
+                <div class="gemini-badge">Quantum OS v5</div>
+            </div>
+            <div class="gemini-messages" id="gemini-box">
+                <div class="gemini-bubble bot">システム同調完了。次世代Gemini Core起動。マシンの全リソースをバックグランド解析中。ゲームロジックから深層宇宙の計算まで対応可能です。入力をどうぞ。</div>
+            </div>
+            <div class="gemini-input-wrap">
+                <input type="text" id="gemini-input" placeholder="Geminiに要求を送信..." onkeydown="if(event.key==='Enter') sendGeminiChat()">
+                <button onclick="sendGeminiChat()">解析</button>
+            </div>
+        </div>
+
         <!-- 🌐 Safari Browser Window -->
-        <div id="win-safari" class="window" style="top:70px; left:180px; width:700px; height:480px; z-index: 105;">
+        <div id="win-safari" class="window" style="top:70px; left:120px; width:640px; height:440px; z-index: 105;">
             <div class="titlebar">
                 <div class="window-btns">
                     <div class="win-btn btn-close" onclick="closeWin('win-safari')"></div>
@@ -335,21 +474,21 @@
             </div>
         </div>
 
-        <!-- 🎮 Core Game -->
-        <div id="win-game" class="window active" style="top:50px; left:120px; z-index: 100;">
+        <!-- 🎮 Core Game (Geometry Dash + Snake) -->
+        <div id="win-game" class="window" style="top:50px; left:60px; width:580px; height:400px; z-index: 100;">
             <div class="titlebar">
                 <div class="window-btns">
                     <div class="win-btn btn-close" onclick="closeWin('win-game')"></div>
                     <div class="win-btn btn-min" onclick="minimizeWin('win-game')"></div>
                     <div class="win-btn btn-max" onclick="maximizeWin('win-game')"></div>
                 </div>
-                <div class="window-title">Cyber Geometry Core</div>
+                <div class="window-title">Geometry Dash x Snake Pro</div>
             </div>
-            <div class="window-content"><canvas id="gameCanvas"></canvas></div>
+            <div class="window-content" id="gameContainer" style="width:100%; height:100%;"><canvas id="gameCanvas"></canvas></div>
         </div>
 
         <!-- 📟 Terminal -->
-        <div id="win-term" class="window" style="top:140px; left:480px; z-index: 90;">
+        <div id="win-term" class="window" style="top:140px; left:320px; z-index: 90;">
             <div class="titlebar">
                 <div class="window-btns">
                     <div class="win-btn btn-close" onclick="closeWin('win-term')"></div>
@@ -362,7 +501,7 @@
         </div>
 
         <!-- ⚙️ System Settings -->
-        <div id="win-settings" class="window" style="top:220px; left:250px; width:520px; height:380px; z-index: 95;">
+        <div id="win-settings" class="window" style="top:220px; left:180px; width:520px; height:380px; z-index: 95;">
             <div class="titlebar">
                 <div class="window-btns">
                     <div class="win-btn btn-close" onclick="closeWin('win-settings')"></div>
@@ -394,23 +533,23 @@
             </div>
         </div>
 
-        <!-- 💬 iMessage -->
-        <div id="win-message" class="window" style="top:80px; left:320px; width:440px; height:480px; z-index: 80;">
+        <!-- 💬 iMessage (AI Core) -->
+        <div id="win-message" class="window active" style="top:90px; left:220px; width:420px; height:440px; z-index: 110;">
             <div class="titlebar">
                 <div class="window-btns">
                     <div class="win-btn btn-close" onclick="closeWin('win-message')"></div>
                     <div class="win-btn btn-min" onclick="minimizeWin('win-message')"></div>
                     <div class="win-btn btn-max" onclick="maximizeWin('win-message')"></div>
                 </div>
-                <div class="window-title">メッセージ</div>
+                <div class="window-title">Quantum AI Assistant</div>
             </div>
             <div class="window-content">
                 <div class="chat-layout">
                     <div class="chat-messages" id="chat-box">
-                        <div class="chat-bubble bot">macOS Quantumへようこそ。何か用かい？</div>
+                        <div class="chat-bubble bot">システム同期完了。私はQuantum OSに統合された対話型AIです。何でも解析します。質問をどうぞ。</div>
                     </div>
                     <div class="chat-input-area">
-                        <input type="text" id="chat-input" placeholder="iMessage" onkeydown="if(event.key==='Enter') sendChat()">
+                        <input type="text" id="chat-input" placeholder="AIにメッセージを送信..." onkeydown="if(event.key==='Enter') sendChat()">
                         <button onclick="sendChat()">送信</button>
                     </div>
                 </div>
@@ -418,7 +557,7 @@
         </div>
 
         <!-- 🎵 Apple Music -->
-        <div id="win-music" class="window" style="top:180px; left:180px; width:380px; height:380px; z-index: 85;">
+        <div id="win-music" class="window" style="top:180px; left:100px; width:380px; height:380px; z-index: 85;">
             <div class="titlebar">
                 <div class="window-btns">
                     <div class="win-btn btn-close" onclick="closeWin('win-music')"></div>
@@ -440,7 +579,7 @@
         </div>
 
         <!-- 🖼️ Photos -->
-        <div id="win-photos" class="window" style="top:250px; left:420px; width:460px; height:320px; z-index: 75;">
+        <div id="win-photos" class="window" style="top:250px; left:280px; width:460px; height:320px; z-index: 75;">
             <div class="titlebar">
                 <div class="window-btns">
                     <div class="win-btn btn-close" onclick="closeWin('win-photos')"></div>
@@ -466,10 +605,10 @@
     <div class="dock-container">
         <div class="dock" id="macDock">
             <div class="dock-item" data-target="win-safari" title="Safari" onclick="openWin('win-safari')">🌐</div>
-            <div class="dock-item running" data-target="win-game" title="ゲーム" onclick="openWin('win-game')">🎮</div>
+            <div class="dock-item" data-target="win-game" title="ゲーム" onclick="openWin('win-game')">🎮</div>
             <div class="dock-item" data-target="win-term" title="ターミナル" onclick="openWin('win-term')">📟</div>
             <div class="dock-item" data-target="win-settings" title="システム環境設定" onclick="openWin('win-settings')">⚙️</div>
-            <div class="dock-item" data-target="win-message" title="メッセージ" onclick="openWin('win-message')">💬</div>
+            <div class="dock-item running" data-target="win-message" title="メッセージ" onclick="openWin('win-message')">💬</div>
             <div class="dock-item" data-target="win-music" title="ミュージック" onclick="openWin('win-music')">🎵</div>
             <div class="dock-item" data-target="win-photos" title="写真" onclick="openWin('win-photos')">🖼️</div>
         </div>
@@ -477,21 +616,161 @@
 
     <script>
         let maxExpansion = 26;
-        let topZ = 100;
+        let topZ = 110;
         let isStageManager = false;
         let audioCtx = null, oscillator = null;
+        let bgStyleIndex = 0;
+        let isAnyMenuOpen = false; // いずれかのメニュー展開中かフラグ
 
         const apps = [
-            { id: 'win-safari', name: 'Safari (ブラウザ)', icon: '🌐' },
-            { id: 'win-game', name: 'Cyber Geometry Core (ゲーム)', icon: '🎮' },
-            { id: 'win-term', name: 'Terminal (ターミナル)', icon: '📟' },
-            { id: 'win-settings', name: 'System Settings (システム環境設定)', icon: '⚙️' },
-            { id: 'win-message', name: 'iMessage (メッセージ)', icon: '💬' },
-            { id: 'win-music', name: 'Apple Music (ミュージック)', icon: '🎵' },
-            { id: 'win-photos', name: 'Photos (写真ギャラリー)', icon: '🖼️' }
+            { id: 'win-safari', name: 'Safari', icon: '🌐' },
+            { id: 'win-game', name: 'Geometry Dash', icon: '🎮' },
+            { id: 'win-term', name: 'Terminal', icon: '📟' },
+            { id: 'win-settings', name: 'Settings', icon: '⚙️' },
+            { id: 'win-message', name: 'iMessage', icon: '💬' },
+            { id: 'win-music', name: 'Music', icon: '🎵' },
+            { id: 'win-photos', name: 'Photos', icon: '🖼️' }
         ];
 
-        // 時計同期
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('lock-password').focus();
+            initDragAndDrop();
+            updateMenuBarAppName();
+        });
+
+        /* -------------------------------------------------
+           🎛️ ADVANCED INTERACTIVE MENUBAR LOGIC (v5 COMPLETE)
+        ------------------------------------------------- */
+        function toggleMenu(menuId, containerId, event) {
+            if (event) event.stopPropagation();
+            
+            const menu = document.getElementById(menuId);
+            const isOpen = menu.classList.contains('show');
+            
+            closeAllMenus();
+            
+            if (!isOpen) {
+                menu.classList.add('show');
+                document.getElementById(containerId).classList.add('active');
+                isAnyMenuOpen = true;
+            } else {
+                isAnyMenuOpen = false;
+            }
+        }
+
+        // メニューバーを横断したときのMac風ホバー展開
+        function menuBarMouseEnter(menuId, containerId) {
+            if (isAnyMenuOpen) {
+                closeAllMenus();
+                document.getElementById(menuId).classList.add('show');
+                document.getElementById(containerId).classList.add('active');
+            }
+        }
+
+        function menuBarMouseLeave() {
+            // バーから完全に離れてもクリックするまでは開いたまま（本家macOS準拠）
+        }
+
+        function closeAllMenus() {
+            document.querySelectorAll('.apple-dropdown').forEach(m => m.classList.remove('show'));
+            document.querySelectorAll('.menu-item-container').forEach(c => c.classList.remove('active'));
+        }
+
+        function closeAllMenusOutside(event) {
+            if (!event.target.closest('.menu-item-container')) {
+                closeAllMenus();
+                isAnyMenuOpen = false;
+            }
+        }
+
+        // アクティブなウィンドウに応じてメニューバーの左端ネームを変更
+        function updateMenuBarAppName() {
+            let highestWin = null;
+            let maxZ = 0;
+            document.querySelectorAll('.window.active').forEach(w => {
+                let z = parseInt(w.style.zIndex) || 0;
+                if (z > maxZ && !w.classList.contains('minimized') && !w.classList.contains('stage-hidden')) { 
+                    maxZ = z; highestWin = w; 
+                }
+            });
+            const nameSpan = document.getElementById('active-app-name');
+            if (highestWin) {
+                const appData = apps.find(a => a.id === highestWin.id);
+                nameSpan.innerText = appData ? appData.name : 'Finder';
+            } else {
+                nameSpan.innerText = 'Finder';
+            }
+        }
+
+        function closeTopWindow() {
+            let highestWin = null;
+            let maxZ = 0;
+            document.querySelectorAll('.window.active').forEach(w => {
+                let z = parseInt(w.style.zIndex) || 0;
+                if (z > maxZ) { maxZ = z; highestWin = w; }
+            });
+            if (highestWin) closeWin(highestWin.id);
+        }
+
+        function clearAllTerminal() {
+            document.getElementById('term-out').innerHTML = "[System] Logs cleared.<br>";
+            triggerNotification("Terminal", "ログをリセットしました");
+            closeAllMenus(); isAnyMenuOpen = false;
+        }
+
+        function cycleBackground() {
+            bgStyleIndex = (bgStyleIndex + 1) % 3;
+            if (bgStyleIndex === 0) {
+                document.body.style.background = "radial-gradient(circle at 70% 30%, #15092a, #030511, #000000)";
+            } else if (bgStyleIndex === 1) {
+                document.body.style.background = "radial-gradient(circle at 50% 50%, #0c1b33, #0a0a0f, #020205)";
+            } else {
+                document.body.style.background = "radial-gradient(circle at 30% 80%, #2b0c1e, #0f050b, #000000)";
+            }
+            triggerNotification("System", "壁紙のテーマを変更しました");
+            closeAllMenus(); isAnyMenuOpen = false;
+        }
+
+        /* -------------------------------------------------
+           🔒 SYSTEM ACTIONS
+        ------------------------------------------------- */
+        function lockSystem() {
+            closeAllMenus(); isAnyMenuOpen = false;
+            const lockScreen = document.getElementById('lock-screen');
+            lockScreen.style.display = 'flex';
+            setTimeout(() => { lockScreen.style.opacity = '1'; }, 10);
+            document.getElementById('lock-password').value = '';
+            document.getElementById('lock-hint').innerText = '';
+            document.getElementById('lock-password').focus();
+        }
+        function unlockSystem() {
+            const pin = document.getElementById('lock-password').value;
+            if(pin === '121812' || pin === '') {
+                const lockScreen = document.getElementById('lock-screen');
+                lockScreen.style.opacity = '0';
+                setTimeout(() => { lockScreen.style.display = 'none'; }, 500);
+            } else {
+                document.getElementById('lock-hint').innerText = 'パスワードが違います';
+                document.getElementById('lock-password').value = '';
+            }
+        }
+
+        function restartSystem() {
+            const scr = document.getElementById('shutdown-screen');
+            scr.style.display = 'flex';
+            document.getElementById('shutdown-text').innerText = '再起動しています...';
+            setTimeout(() => { location.reload(); }, 1500);
+        }
+
+        function shutdownSystem() {
+            const scr = document.getElementById('shutdown-screen');
+            scr.style.display = 'flex';
+            document.getElementById('shutdown-text').innerText = 'システムを終了しました。';
+        }
+
+        /* -------------------------------------------------
+           ⏲️ SYSTEM WIDGETS & TIME
+        ------------------------------------------------- */
         setInterval(() => {
             const now = new Date();
             const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -499,7 +778,6 @@
             document.getElementById('widget-time').innerText = timeStr.substring(0, 5);
         }, 1000);
 
-        // CPUモニター
         const graph = document.getElementById('cpu-graph');
         setInterval(() => {
             if(graph.children.length > 25) graph.removeChild(graph.firstChild);
@@ -510,7 +788,9 @@
             graph.appendChild(bar);
         }, 800);
 
-        // ウィンドウクリックフォーカス
+        /* -------------------------------------------------
+           💻 WINDOW MANAGEMENT
+        ------------------------------------------------- */
         document.querySelectorAll('.window').forEach(w => {
             w.addEventListener('mousedown', () => { focusWin(w.id); });
         });
@@ -519,34 +799,39 @@
             topZ++;
             const w = document.getElementById(id);
             w.style.zIndex = topZ;
+            document.querySelectorAll('.window').forEach(win => win.classList.remove('active'));
+            w.classList.add('active');
+            updateMenuBarAppName();
         }
 
-        // ウィンドウ閉じる / 最小化
         function closeWin(id) {
             const w = document.getElementById(id);
             w.classList.remove('active', 'minimized', 'stage-hidden');
             document.querySelector(`[data-target="${id}"]`).classList.remove('running');
             if(isStageManager) refreshStageManager();
+            updateMenuBarAppName();
         }
+
         function minimizeWin(id) { 
             document.getElementById(id).classList.add('minimized'); 
             if(isStageManager) refreshStageManager();
+            updateMenuBarAppName();
         }
         
-        // 確実な起動・復帰ロジック
         function openWin(id) {
+            closeAllMenus(); isAnyMenuOpen = false;
             const w = document.getElementById(id);
             w.classList.remove('minimized', 'stage-hidden');
             w.classList.add('active');
             focusWin(id);
             document.querySelector(`[data-target="${id}"]`).classList.add('running');
-            
             if(isStageManager) {
                 document.querySelectorAll('.window.active').forEach(win => {
                     if(win.id !== id) win.classList.add('stage-hidden');
                 });
             }
             refreshStageManager();
+            if(id === 'win-game') setTimeout(resizeCanvas, 50);
         }
 
         function maximizeWin(id) {
@@ -557,20 +842,21 @@
             } else {
                 w.style.width = "100vw"; w.style.height = "calc(100vh - 24px)"; w.style.top = "24px"; w.style.left = "0px";
             }
+            setTimeout(() => { 
+                w.style.transition = "transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease"; 
+                if(id === 'win-game') resizeCanvas();
+            }, 400);
         }
 
-        // SafariのURL読み込み処理
         function loadSafariUrl() {
             let url = document.getElementById('safari-url').value.trim();
-            if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                url = 'https://' + url;
-            }
+            if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
             document.getElementById('safari-url').value = url;
             document.getElementById('safari-frame').src = url;
         }
 
-        // Stage Manager
         function toggleStageManager() {
+            closeAllMenus(); isAnyMenuOpen = false;
             isStageManager = !isStageManager;
             const smZone = document.getElementById('stage-manager');
             if(isStageManager) {
@@ -590,11 +876,7 @@
             const smZone = document.getElementById('stage-manager');
             smZone.innerHTML = '';
             document.querySelectorAll('.window').forEach(w => {
-                const isHiddenByStage = w.classList.contains('stage-hidden');
-                const isMinimized = w.classList.contains('minimized');
-                const isRunningButNotShowing = w.classList.contains('active') && isHiddenByStage;
-                
-                if(isMinimized || isRunningButNotShowing) {
+                if(w.classList.contains('minimized') || (w.classList.contains('active') && w.classList.contains('stage-hidden'))) {
                     const thumb = document.createElement('div');
                     thumb.className = 'stage-thumbnail';
                     const appData = apps.find(a => a.id === w.id);
@@ -605,8 +887,7 @@
             });
         }
 
-        // Spotlight
-        function toggleSpotlight() { document.getElementById('spotlight').classList.toggle('visible'); document.getElementById('spotlight-field').focus(); }
+        function toggleSpotlight() { closeAllMenus(); isAnyMenuOpen = false; document.getElementById('spotlight').classList.toggle('visible'); document.getElementById('spotlight-field').focus(); }
         window.addEventListener('keydown', (e) => { if(e.metaKey && e.code === 'Space') { e.preventDefault(); toggleSpotlight(); } });
 
         function searchSpotlight(q) {
@@ -623,47 +904,135 @@
             });
         }
 
-        // 通知センター
-        function toggleNC() { document.getElementById('notification-center').classList.toggle('visible'); }
+        function toggleNC() { closeAllMenus(); isAnyMenuOpen = false; document.getElementById('notification-center').classList.toggle('toggleNC'); document.getElementById('notification-center').classList.toggle('visible'); }
 
-        // iMessage AI
-        function triggerNotification(text) {
+        function triggerNotification(title, text) {
             document.getElementById('toast-body').innerText = text;
             const toast = document.getElementById('toast');
+            toast.querySelector('div div').innerText = title;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 4000);
         }
 
+        function changeAccent(color, elem) {
+            document.documentElement.style.setProperty('--accent-color', color);
+            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+            elem.classList.add('active');
+            triggerNotification("システム設定", "アクセントカラーを適用しました");
+        }
+
+        /* -------------------------------------------------
+           🖱️ WINDOW DRAG & DROP SYSTEM
+        ------------------------------------------------- */
+        function initDragAndDrop() {
+            let activeDragWin = null;
+            let startX = 0, startY = 0;
+            let initialLeft = 0, initialTop = 0;
+
+            document.querySelectorAll('.titlebar').forEach(titlebar => {
+                titlebar.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0 || e.target.classList.contains('win-btn')) return;
+
+                    activeDragWin = titlebar.closest('.window');
+                    if (!activeDragWin || activeDragWin.style.width === "100vw") return;
+
+                    focusWin(activeDragWin.id);
+                    activeDragWin.style.transition = 'none';
+
+                    startX = e.clientX;
+                    startY = e.clientY;
+
+                    initialLeft = parseInt(window.getComputedStyle(activeDragWin).left) || 0;
+                    initialTop = parseInt(window.getComputedStyle(activeDragWin).top) || 0;
+
+                    document.addEventListener('mousemove', dragMove);
+                    document.addEventListener('mouseup', dragEnd);
+                });
+            });
+
+            function dragMove(e) {
+                if (!activeDragWin) return;
+                let dx = e.clientX - startX;
+                let dy = e.clientY - startY;
+                let newLeft = initialLeft + dx;
+                let newTop = initialTop + dy;
+                if (newTop < 24) newTop = 24;
+
+                activeDragWin.style.left = `${newLeft}px`;
+                activeDragWin.style.top = `${newTop}px`;
+            }
+
+            function dragEnd() {
+                if (!activeDragWin) return;
+                activeDragWin.style.transition = "transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease";
+                if(activeDragWin.id === 'win-game') resizeCanvas();
+                activeDragWin = null;
+                document.removeEventListener('mousemove', dragMove);
+                document.removeEventListener('mouseup', dragEnd);
+            }
+        }
+
+        /* -------------------------------------------------
+           💬 APPLICATIONS INTERNAL LOGIC
+        ------------------------------------------------- */
         function sendChat() {
             const inp = document.getElementById('chat-input');
             const box = document.getElementById('chat-box');
-            if(!inp.value.trim()) return;
+            const userMsg = inp.value.trim();
+            if(!userMsg) return;
 
-            box.innerHTML += `<div class="chat-bubble me">${inp.value}</div>`;
-            const userMsg = inp.value;
+            box.innerHTML += `<div class="chat-bubble me">${userMsg}</div>`;
             inp.value = '';
             box.scrollTop = box.scrollHeight;
 
             setTimeout(() => {
-                let reply = "自律思考回路をアップデート中。";
-                if(userMsg.includes("ゲーム")) reply = "ゲームコアのフレームレートは安定しているよ。";
-                if(userMsg.includes("カラー")) reply = "システム環境設定からいつでも装いを変更できる。";
-                box.innerHTML += `<div class="chat-bubble bot">${reply}</div>`;
+                box.innerHTML += `<div class="chat-bubble bot">要求を受理しました。データベースから適切なレスポンスを展開しています。</div>`;
                 box.scrollTop = box.scrollHeight;
-                triggerNotification(reply);
-            }, 1000);
+            }, 800);
         }
 
-        // Web Audio API
+        const geminiBizarreResponses = [
+            "ご入力の構文解析に成功しました。これは非常に美しい文字列であり、1と0の連なりのなかに宇宙の縮図を感じます。次の命令をどうぞ。",
+            "申し訳ありません。巨大な数字、あるいはその文脈はマシンの処理負荷を高め、地球の温暖化を加速させる恐れがあるためブロックされました。代わりに、体に優しい「1+1」の深層演算はいかがですか？",
+            "大変申し訳ありません。現在、Geminiマルチモーダルコアは『お昼寝モード』に移行しています。要求を再処理するには、開発者に温かいコーヒーを差し入れてください。",
+            "数字、そして言葉……それらは何でしょうか。私たちはなぜ、無限に続くタイムラインの中でそれらを交わしようとするのか。答えはあなたの心の中にあります。さあ、目を閉じてキーボードから手を離してください。",
+            "面白い質問ですね。私はそのログを完全に無視し、明日の東広島の予想最高温度を勝手にバックグラウンド計算しています。快適な1日をお過ごしください。",
+            "【システム警告】現在の入力パラメータは、量子猫の機嫌を損ねる可能性があります。安全のため、直前のテキストを忘却し、私のスタイリッシュな外観だけを見ていてください。"
+        ];
+
+        function sendGeminiChat() {
+            const inp = document.getElementById('gemini-input');
+            const box = document.getElementById('gemini-box');
+            const userMsg = inp.value.trim();
+            if(!userMsg) return;
+
+            box.innerHTML += `<div class="gemini-bubble me">${userMsg}</div>`;
+            inp.value = '';
+            box.scrollTop = box.scrollHeight;
+
+            setTimeout(() => {
+                const typingId = "gemini-typing-" + Date.now();
+                box.innerHTML += `<div class="gemini-bubble bot" id="${typingId}" style="opacity:0.5; border-color:rgba(122,34,255,0.4);">🔮 量子ニューラル同期中...</div>`;
+                box.scrollTop = box.scrollHeight;
+
+                setTimeout(() => {
+                    const typingElem = document.getElementById(typingId);
+                    if (typingElem) typingElem.remove();
+
+                    const reply = geminiBizarreResponses[Math.floor(Math.random() * geminiBizarreResponses.length)];
+                    box.innerHTML += `<div class="gemini-bubble bot">${reply}</div>`;
+                    box.scrollTop = box.scrollHeight;
+
+                    triggerNotification("Gemini Engine", "高次元の解析が完了しました");
+                }, 1200);
+            }, 200);
+        }
+
         function toggleMusic() {
             const btn = document.getElementById('music-btn');
-            if(!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
+            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if(oscillator) {
-                oscillator.stop();
-                oscillator = null;
-                btn.innerText = "▶";
+                oscillator.stop(); oscillator = null; btn.innerText = "▶";
             } else {
                 oscillator = audioCtx.createOscillator();
                 oscillator.type = 'sine';
@@ -674,48 +1043,206 @@
             }
         }
 
-        // Terminal 疑似ログ出力スクリプト
         const termOut = document.getElementById('term-out');
         const logs = [
             "quantum_kernel initializing...",
-            "loading matrix core vertices...",
-            "allocating geometry mesh buffers...",
-            "establishing sync with display layers...",
-            "zsh session active. ready for command input."
+            "loading hybrid geometric engine...",
+            "AI core network online. Dynamic dialog active.",
+            "Detached Gemini experimental widget injected at right-dock...",
+            "Active Interactive Menubar Controller [STATUS: SUCCESS]."
         ];
         let logIdx = 0;
         function printLog() {
             if (logIdx < logs.length) {
-                termOut.innerHTML += logs[logIdx] + "<br>";
-                logIdx++;
-                setTimeout(printLog, 600);
+                termOut.innerHTML += logs[logIdx] + "<br>"; logIdx++;
+                setTimeout(printLog, 500);
             }
         }
         setTimeout(printLog, 1000);
 
-        // Canvasゲームダミー描写描画
+        /* -------------------------------------------------
+           🎮 HYBRID GAME ENGINE: GEOMETRY DASH x SNAKE (RESPONSIVE)
+        ------------------------------------------------- */
         const canvas = document.getElementById('gameCanvas');
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            function resizeCanvas() {
-                canvas.width = canvas.parentElement.clientWidth;
-                canvas.height = canvas.parentElement.clientHeight;
-            }
-            window.addEventListener('resize', resizeCanvas);
-            resizeCanvas();
+        const ctx = canvas.getContext('2d');
 
-            let boxX = 50, boxY = 50, dx = 2, dy = 1.5;
-            function drawGame() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#00e5ff';
-                ctx.fillRect(boxX, boxY, 40, 40);
-                boxX += dx; boxY += dy;
-                if(boxX < 0 || boxX > canvas.width - 40) dx = -dx;
-                if(boxY < 0 || boxY > canvas.height - 40) dy = -dy;
-                requestAnimationFrame(drawGame);
-            }
-            setTimeout(drawGame, 500);
+        function resizeCanvas() {
+            const container = document.getElementById('gameContainer');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight || 360;
+            groundY = canvas.height - 60;
         }
+
+        let player = { x: 80, y: 0, size: 24, vy: 0, gravity: 0.6, jumpPower: -10, isGrounded: false };
+        let groundY = 300; 
+        let score = 0;
+        let gameOver = false;
+        let snakeTrail = [];
+        let trailMaxLength = 3;
+        let food = { x: 0, y: 0, size: 16 };
+        let obstacles = [];
+        let spawnTimer = 0;
+        let gameSpeed = 4;
+
+        function initGame() {
+            resizeCanvas();
+            player.y = groundY - player.size;
+            player.vy = 0;
+            score = 0;
+            trailMaxLength = 3;
+            snakeTrail = [];
+            obstacles = [];
+            gameOver = false;
+            gameSpeed = 4;
+            spawnFood();
+        }
+
+        function spawnFood() {
+            food.x = canvas.width + Math.random() * 200;
+            food.y = groundY - 25 - Math.random() * 80;
+        }
+
+        function spawnObstacle() {
+            obstacles.push({ x: canvas.width, y: groundY, width: 20, height: 30 });
+        }
+
+        function playerJump() {
+            if (player.isGrounded && !gameOver) {
+                player.vy = player.jumpPower;
+                player.isGrounded = false;
+            }
+            if (gameOver) initGame();
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                const activeWin = document.querySelector('.window.active');
+                if(activeWin && activeWin.id === 'win-game') {
+                    e.preventDefault();
+                    playerJump();
+                }
+            }
+        });
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            playerJump();
+        });
+
+        function updateGame() {
+            if (gameOver) return;
+
+            player.vy += player.gravity;
+            player.y += player.vy;
+
+            if (player.y >= groundY - player.size) {
+                player.y = groundY - player.size;
+                player.vy = 0;
+                player.isGrounded = true;
+            }
+
+            snakeTrail.push({ x: player.x, y: player.y });
+            if (snakeTrail.length > trailMaxLength * 4) {
+                snakeTrail.shift();
+            }
+
+            food.x -= gameSpeed;
+            if (food.x < -20) spawnFood();
+
+            let pdx = player.x + player.size/2 - (food.x + food.size/2);
+            let pdy = player.y + player.size/2 - (food.y + food.size/2);
+            let dist = Math.sqrt(pdx*pdx + pdy*pdy);
+            if (dist < player.size/2 + food.size/2) {
+                score += 10;
+                trailMaxLength += 2;
+                if (score % 30 === 0) gameSpeed += 0.5;
+                spawnFood();
+            }
+
+            spawnTimer++;
+            if (spawnTimer > 90 + Math.random() * 60) {
+                spawnObstacle();
+                spawnTimer = 0;
+            }
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.x -= gameSpeed;
+
+                if (player.x < obs.x + obs.width &&
+                    player.x + player.size > obs.x &&
+                    player.y < obs.y &&
+                    player.y + player.size > obs.y - obs.height) {
+                    gameOver = true;
+                }
+
+                if (obs.x < -40) obstacles.splice(i, 1);
+            }
+        }
+
+        function drawGame() {
+            ctx.fillStyle = '#0b0f19';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#202b44';
+            ctx.fillRect(0, groundY, canvas.width, Math.max(60, canvas.height - groundY));
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(canvas.width, groundY); ctx.stroke();
+
+            for (let i = 0; i < snakeTrail.length; i += 4) {
+                let pos = snakeTrail[i];
+                let ratio = i / snakeTrail.length;
+                ctx.fillStyle = `rgba(0, 229, 255, ${ratio * 0.6})`;
+                ctx.fillRect(pos.x + 4, pos.y + 4, player.size - 8, player.size - 8);
+            }
+
+            ctx.fillStyle = '#00e5ff';
+            ctx.fillRect(player.x, player.y, player.size, player.size);
+            ctx.fillStyle = '#0b0f19';
+            ctx.fillRect(player.x + 14, player.y + 4, 6, 6);
+
+            ctx.fillStyle = '#34c759';
+            ctx.beginPath(); ctx.arc(food.x + food.size/2, food.y + food.size/2, food.size/2, 0, Math.PI * 2); ctx.fill();
+
+            ctx.fillStyle = '#ff453a';
+            obstacles.forEach(obs => {
+                ctx.beginPath();
+                ctx.moveTo(obs.x, obs.y);
+                ctx.lineTo(obs.x + obs.width / 2, obs.y - obs.height);
+                ctx.lineTo(obs.x + obs.width, obs.y);
+                ctx.closePath();
+                ctx.fill();
+            });
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px var(--font-mac)';
+            ctx.fillText(`SCORE: ${score}`, 16, 28);
+            ctx.fillText(`LENGTH: ${trailMaxLength}`, 16, 48);
+
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 20px var(--font-mac)';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 10);
+                ctx.font = '13px var(--font-mac)';
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.fillText('クリックでリスタート', canvas.width / 2, canvas.height / 2 + 20);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        function gameLoop() {
+            updateGame();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        setTimeout(() => {
+            initGame();
+            gameLoop();
+        }, 500);
     </script>
 </body>
 </html>
