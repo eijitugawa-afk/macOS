@@ -106,6 +106,22 @@
         /* ---------------------------------
            APPLICATION INTERFACES
         --------------------------------- */
+        /* 🌐 Safari Browser */
+        .safari-layout { display: flex; flex-direction: column; height: 100%; background: #fff; }
+        .safari-address-bar {
+            height: 38px; background: rgba(0, 0, 0, 0.05); border-bottom: 0.5px solid rgba(0,0,0,0.1);
+            display: flex; align-items: center; padding: 0 12px; gap: 10px;
+        }
+        .safari-address-input-wrap {
+            flex-grow: 1; background: rgba(0, 0, 0, 0.06); border-radius: 6px;
+            display: flex; align-items: center; padding: 4px 10px;
+        }
+        .safari-address-input-wrap input {
+            width: 100%; background: transparent; border: none; outline: none;
+            font-size: 13px; color: #333; text-align: center;
+        }
+        .safari-view { width: 100%; flex-grow: 1; border: none; background: #fff; user-select: auto; }
+
         /* ⚙️ System Settings */
         .settings-layout { display: flex; height: 100%; }
         .settings-sidebar {
@@ -220,13 +236,16 @@
             display: flex; justify-content: center; align-items: center; font-size: 26px;
             cursor: pointer; transform-origin: bottom center; position: relative;
             will-change: width, height, transform;
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .dock-item:hover {
+            transform: scale(1.22) translateY(-4px);
         }
         .dock-item.running::after {
             content: ''; position: absolute; bottom: -5px; width: 4px; height: 4px;
             background: #fff; border-radius: 50%; opacity: 0.95; box-shadow: 0 0 4px #fff;
         }
 
-        /* Mac独自のピョンピョン跳ねるアニメーション */
         @keyframes dockBounce {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-20px); }
@@ -293,6 +312,28 @@
 
     <!-- 🗺️ デスクトップ -->
     <div id="desktop">
+
+        <!-- 🌐 Safari Browser Window -->
+        <div id="win-safari" class="window" style="top:70px; left:180px; width:700px; height:480px; z-index: 105;">
+            <div class="titlebar">
+                <div class="window-btns">
+                    <div class="win-btn btn-close" onclick="closeWin('win-safari')"></div>
+                    <div class="win-btn btn-min" onclick="minimizeWin('win-safari')"></div>
+                    <div class="win-btn btn-max" onclick="maximizeWin('win-safari')"></div>
+                </div>
+                <div class="window-title">Safari</div>
+            </div>
+            <div class="window-content">
+                <div class="safari-layout">
+                    <div class="safari-address-bar">
+                        <div class="safari-address-input-wrap">
+                            <input type="text" id="safari-url" value="https://bing.com" onkeydown="if(event.key==='Enter') loadSafariUrl()">
+                        </div>
+                    </div>
+                    <iframe id="safari-frame" src="https://bing.com" class="safari-view"></iframe>
+                </div>
+            </div>
+        </div>
 
         <!-- 🎮 Core Game -->
         <div id="win-game" class="window active" style="top:50px; left:120px; z-index: 100;">
@@ -424,12 +465,13 @@
     <!-- 🔘 Dock -->
     <div class="dock-container">
         <div class="dock" id="macDock">
-            <div class="dock-item running" data-target="win-game" title="ゲーム">🎮</div>
-            <div class="dock-item" data-target="win-term" title="ターミナル">📟</div>
-            <div class="dock-item" data-target="win-settings" title="システム環境設定">⚙️</div>
-            <div class="dock-item" data-target="win-message" title="メッセージ">💬</div>
-            <div class="dock-item" data-target="win-music" title="ミュージック">🎵</div>
-            <div class="dock-item" data-target="win-photos" title="写真">🖼️</div>
+            <div class="dock-item" data-target="win-safari" title="Safari" onclick="openWin('win-safari')">🌐</div>
+            <div class="dock-item running" data-target="win-game" title="ゲーム" onclick="openWin('win-game')">🎮</div>
+            <div class="dock-item" data-target="win-term" title="ターミナル" onclick="openWin('win-term')">📟</div>
+            <div class="dock-item" data-target="win-settings" title="システム環境設定" onclick="openWin('win-settings')">⚙️</div>
+            <div class="dock-item" data-target="win-message" title="メッセージ" onclick="openWin('win-message')">💬</div>
+            <div class="dock-item" data-target="win-music" title="ミュージック" onclick="openWin('win-music')">🎵</div>
+            <div class="dock-item" data-target="win-photos" title="写真" onclick="openWin('win-photos')">🖼️</div>
         </div>
     </div>
 
@@ -440,6 +482,7 @@
         let audioCtx = null, oscillator = null;
 
         const apps = [
+            { id: 'win-safari', name: 'Safari (ブラウザ)', icon: '🌐' },
             { id: 'win-game', name: 'Cyber Geometry Core (ゲーム)', icon: '🎮' },
             { id: 'win-term', name: 'Terminal (ターミナル)', icon: '📟' },
             { id: 'win-settings', name: 'System Settings (システム環境設定)', icon: '⚙️' },
@@ -490,21 +533,14 @@
             if(isStageManager) refreshStageManager();
         }
         
-        // 🚀 【最重要の修正点】確実な起動・復帰ロジック
+        // 確実な起動・復帰ロジック
         function openWin(id) {
             const w = document.getElementById(id);
-            
-            // 全ての一時的な非表示状態を強制クリア
             w.classList.remove('minimized', 'stage-hidden');
             w.classList.add('active');
-            
-            // 最前面へ引き出す
             focusWin(id);
-            
-            // Dockに起動中のインジケータ（白丸）を付与
             document.querySelector(`[data-target="${id}"]`).classList.add('running');
             
-            // Stage Managerが有効な場合は他のアクティブ窓を裏へ回す
             if(isStageManager) {
                 document.querySelectorAll('.window.active').forEach(win => {
                     if(win.id !== id) win.classList.add('stage-hidden');
@@ -523,7 +559,17 @@
             }
         }
 
-        // 🎨 Stage Manager
+        // SafariのURL読み込み処理
+        function loadSafariUrl() {
+            let url = document.getElementById('safari-url').value.trim();
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+            document.getElementById('safari-url').value = url;
+            document.getElementById('safari-frame').src = url;
+        }
+
+        // Stage Manager
         function toggleStageManager() {
             isStageManager = !isStageManager;
             const smZone = document.getElementById('stage-manager');
@@ -559,7 +605,7 @@
             });
         }
 
-        // 🔍 Spotlight
+        // Spotlight
         function toggleSpotlight() { document.getElementById('spotlight').classList.toggle('visible'); document.getElementById('spotlight-field').focus(); }
         window.addEventListener('keydown', (e) => { if(e.metaKey && e.code === 'Space') { e.preventDefault(); toggleSpotlight(); } });
 
@@ -577,10 +623,10 @@
             });
         }
 
-        // 🎛️ 通知センター
+        // 通知センター
         function toggleNC() { document.getElementById('notification-center').classList.toggle('visible'); }
 
-        // 💬 iMessage AI
+        // iMessage AI
         function triggerNotification(text) {
             document.getElementById('toast-body').innerText = text;
             const toast = document.getElementById('toast');
@@ -608,121 +654,68 @@
             }, 1000);
         }
 
-        // 🎵 Web Audio API
+        // Web Audio API
         function toggleMusic() {
             const btn = document.getElementById('music-btn');
             if(!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                oscillator = audioCtx.createOscillator();
-                let gainNode = audioCtx.createGain();
-                
-                oscillator.type = 'triangle';
-                oscillator.frequency.setValueAtTime(140, audioCtx.currentTime);
-                
-                setInterval(() => {
-                    const freqs = [140, 160, 180, 210, 240];
-                    if(oscillator) oscillator.frequency.setValueAtTime(freqs[Math.floor(Math.random()*freqs.length)], audioCtx.currentTime);
-                }, 300);
-
-                gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                oscillator.start();
-                btn.innerText = '⏸';
+            }
+            if(oscillator) {
+                oscillator.stop();
+                oscillator = null;
+                btn.innerText = "▶";
             } else {
-                if(audioCtx.state === 'running') { audioCtx.suspend(); btn.innerText = '▶'; }
-                else { audioCtx.resume(); btn.innerText = '⏸'; }
+                oscillator = audioCtx.createOscillator();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+                oscillator.connect(audioCtx.destination);
+                oscillator.start();
+                btn.innerText = "■";
             }
         }
 
-        // ⚙️ システム設定連動
-        function changeAccent(color, el) {
-            document.styleSheets[0].cssRules[0].style.setProperty('--accent-color', color);
-            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-            el.classList.add('active');
-        }
-
-        // ドラッグシステム
-        document.querySelectorAll('.titlebar').forEach(tb => {
-            let isDrag = false, sx, sy, ix, iy, w = tb.parentElement;
-            tb.addEventListener('mousedown', (e) => {
-                if(e.target.classList.contains('win-btn')) return;
-                isDrag = true; sx = e.clientX; sy = e.clientY;
-                ix = w.offsetLeft; iy = w.offsetTop; w.style.transition = "none";
-                focusWin(w.id);
-            });
-            window.addEventListener('mousemove', (e) => {
-                if(!isDrag) return;
-                w.style.left = `${ix + (e.clientX - sx)}px`; w.style.top = `${iy + (e.clientY - sy)}px`;
-            });
-            window.addEventListener('mouseup', () => { if(isDrag) { isDrag = false; w.style.transition = "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease"; } });
-        });
-
-        //  Dock魚眼エフェクト ＆ 跳ねる起動アニメーション
-        const dock = document.getElementById('macDock');
-        const items = document.querySelectorAll('.dock-item');
-        
-        dock.addEventListener('mousemove', (e) => {
-            items.forEach(item => {
-                const rect = item.getBoundingClientRect();
-                const distance = Math.abs(e.clientX - (rect.left + rect.width / 2));
-                let expansion = 0, range = 140;
-                if (distance < range) expansion = Math.cos((distance / range) * Math.PI / 2) * maxExpansion;
-                item.style.width = item.style.height = `${46 + expansion}px`;
-            });
-        });
-        
-        dock.addEventListener('mouseleave', () => { items.forEach(item => { item.style.width = item.style.height = '46px'; }); });
-        
-        items.forEach(item => { 
-            item.addEventListener('click', () => { 
-                const targetId = item.dataset.target;
-                if(targetId) {
-                    // Macのようにアイコンを一時的にピョンピョン跳ねさせる
-                    item.classList.add('bouncing');
-                    setTimeout(() => { item.classList.remove('bouncing'); }, 800);
-                    
-                    // アプリウインドウの起動/復帰処理を実行
-                    openWin(targetId);
-                } 
-            }); 
-        });
-
-        // ホットコーナー
-        document.getElementById('hot-corner').addEventListener('mouseenter', () => {
-            document.querySelectorAll('.window.active').forEach(w => w.classList.toggle('minimized'));
-        });
-
-        // ターミナルログ
-        const term = document.getElementById('term-out');
-        const logs = ["Stage Manager engine online.", "Web Audio Sound Synth initialized.", "Spotlight index builder: Complete.", "Quantum macOS Core fully powered."];
+        // Terminal 疑似ログ出力スクリプト
+        const termOut = document.getElementById('term-out');
+        const logs = [
+            "quantum_kernel initializing...",
+            "loading matrix core vertices...",
+            "allocating geometry mesh buffers...",
+            "establishing sync with display layers...",
+            "zsh session active. ready for command input."
+        ];
         let logIdx = 0;
-        setInterval(() => { if(logIdx < logs.length) { term.innerHTML += `root@quantum-mac ~ % ${logs[logIdx]}<br>`; logIdx++; } }, 1000);
-
-        // 🎮 ゲームレンダラー
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = 560; canvas.height = 360;
-        let player = { x: 60, y: 200, size: 22, vy: 0, gravity: 0.5, jump: -10, grounded: false };
-
-        function drawGame() {
-            ctx.fillStyle = '#020208'; ctx.fillRect(0, 0, 560, 360);
-            player.vy += player.gravity; player.y += player.vy;
-            if(player.y > 260) { player.y = 260; player.vy = 0; player.grounded = true; }
-
-            const currentAccent = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
-            ctx.shadowBlur = 20; ctx.shadowColor = currentAccent; ctx.fillStyle = currentAccent;
-            ctx.fillRect(player.x, player.y, player.size, player.size);
-            ctx.shadowBlur = 0;
-
-            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-            ctx.beginPath(); ctx.moveTo(0, 282); ctx.lineTo(560, 282); ctx.stroke();
-            requestAnimationFrame(drawGame);
+        function printLog() {
+            if (logIdx < logs.length) {
+                termOut.innerHTML += logs[logIdx] + "<br>";
+                logIdx++;
+                setTimeout(printLog, 600);
+            }
         }
-        window.addEventListener('keydown', (e) => {
-            if(e.code === 'Space' && player.grounded && document.activeElement.tagName !== 'INPUT') { player.vy = player.jump; player.grounded = false; }
-        });
-        drawGame();
+        setTimeout(printLog, 1000);
+
+        // Canvasゲームダミー描写描画
+        const canvas = document.getElementById('gameCanvas');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            function resizeCanvas() {
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+            }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            let boxX = 50, boxY = 50, dx = 2, dy = 1.5;
+            function drawGame() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#00e5ff';
+                ctx.fillRect(boxX, boxY, 40, 40);
+                boxX += dx; boxY += dy;
+                if(boxX < 0 || boxX > canvas.width - 40) dx = -dx;
+                if(boxY < 0 || boxY > canvas.height - 40) dy = -dy;
+                requestAnimationFrame(drawGame);
+            }
+            setTimeout(drawGame, 500);
+        }
     </script>
 </body>
 </html>
